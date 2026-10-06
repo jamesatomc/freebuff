@@ -120,9 +120,20 @@
     "configuration": {
       "title": "Freebuff",
       "properties": {
+        "freebuff.settingsPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the Freebuff `settings.json` where the model pick is stored. Leave empty for the default (`~/.config/manicode/settings.json`)."
+        },
         "freebuff.packageManager": {
           "type": "string",
-          "enum": ["", "npm", "bun", "pnpm", "yarn"],
+          "enum": [
+            "",
+            "npm",
+            "bun",
+            "pnpm",
+            "yarn"
+          ],
           "default": "",
           "markdownDescription": "Package manager used by `Freebuff: Install or Update`. Leave empty to auto-detect or ask."
         },
@@ -144,8 +155,8 @@
         },
         "freebuff.terminal.submitSequence": {
           "type": "string",
-          "default": "\r",
-          "markdownDescription": "Bytes appended to a prompt to submit it inside the Freebuff TUI. `\\r` (Enter) by default; use `\\n` if prompts never submit."
+          "default": "\n",
+          "markdownDescription": "Bytes appended to a prompt to submit it inside the Freebuff TUI. `\\n` (line feed) by default — the TUI ignores `\\r`."
         },
         "freebuff.terminal.revealOnSend": {
           "type": "boolean",

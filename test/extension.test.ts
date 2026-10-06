@@ -3,8 +3,11 @@
  * of the `vscode` API, so registration and prompt typing are verified without
  * an Extension Development Host.
  */
-import { describe, expect, mock, test } from 'bun:test';
-import type * as vscode from 'vscode';
+import { afterAll, describe, expect, mock, test } from "bun:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import type * as vscode from "vscode";
 
 interface RegisteredCommand {
   name: string;
@@ -17,9 +20,14 @@ interface SentText {
 }
 
 const commands: RegisteredCommand[] = [];
-const providers: Array<{ viewType: string }> = [];
+const providers: Array<{ viewType: string; provider: unknown }> = [];
 const messages: string[] = [];
 const sent: SentText[] = [];
+const postedMessages: unknown[] = [];
+const tempSettingsPath = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), "freebuff-ext-")),
+  "settings.json",
+);
 let statusBar: { text: string; tooltip: string; show(): void } | undefined;
 
 function makeWatcher(): {
@@ -49,8 +57,18 @@ const vscodeStub = {
     ) {}
   },
   Uri: {
-    file: (p: string) => ({ fsPath: p, path: p, scheme: 'file', toString: () => `file://${p}` }),
-    parse: (value: string) => ({ fsPath: value, path: value, scheme: 'https', toString: () => value }),
+    file: (p: string) => ({
+      fsPath: p,
+      path: p,
+      scheme: "file",
+      toString: () => `file://${p}`,
+    }),
+    parse: (value: string) => ({
+      fsPath: value,
+      path: value,
+      scheme: "https",
+      toString: () => value,
+    }),
     from: (parts: { scheme: string; path: string }) => ({
       fsPath: parts.path,
       path: parts.path,
@@ -67,12 +85,12 @@ const vscodeStub = {
       dispose: () => undefined,
     }),
     createStatusBarItem: () => {
-      statusBar = { text: '', tooltip: '', show: () => undefined };
+      statusBar = { text: "", tooltip: "", show: () => undefined };
       return statusBar;
     },
     createTreeView: () => ({ dispose: () => undefined }),
-    registerWebviewViewProvider: (viewType: string) => {
-      providers.push({ viewType });
+    registerWebviewViewProvider: (viewType: string, provider: unknown) => {
+      providers.push({ viewType, provider });
       return { dispose: () => undefined };
     },
     createFileSystemWatcher: () => makeWatcher(),
@@ -85,6 +103,8 @@ const vscodeStub = {
       dispose: () => undefined,
     }),
     onDidCloseTerminal: () => ({ dispose: () => undefined }),
+    onDidChangeActiveTextEditor: () => ({ dispose: () => undefined }),
+    activeTextEditor: undefined,
     showInformationMessage: async (message: string) => {
       messages.push(message);
       return undefined;
@@ -104,14 +124,19 @@ const vscodeStub = {
   workspace: {
     workspaceFolders: [] as unknown[],
     getConfiguration: () => ({
-      get: (_key: string, fallback: unknown) => fallback,
+      get: (key: string, fallback: unknown) =>
+        key === "settingsPath" ? tempSettingsPath : fallback,
     }),
     createFileSystemWatcher: () => makeWatcher(),
     registerTextDocumentContentProvider: () => ({ dispose: () => undefined }),
     openTextDocument: async () => ({}),
+    findFiles: async () => [],
   },
   commands: {
-    registerCommand: (name: string, callback: (...args: unknown[]) => unknown) => {
+    registerCommand: (
+      name: string,
+      callback: (...args: unknown[]) => unknown,
+    ) => {
       commands.push({ name, callback });
       return { dispose: () => undefined };
     },
@@ -120,22 +145,39 @@ const vscodeStub = {
   env: { openExternal: async () => true },
 };
 
-mock.module('vscode', () => vscodeStub);
+mock.module("vscode", () => vscodeStub);
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const extension = require('../src/extension') as typeof import('../src/extension');
+const extension =
+  require("../src/extension") as typeof import("../src/extension");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { FreebuffTerminal } = require('../src/terminal') as typeof import('../src/terminal');
+const { FreebuffTerminal } =
+  require("../src/terminal") as typeof import("../src/terminal");
 
-async function waitFor(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs: number,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
     if (Date.now() > deadline) {
-      throw new Error('waitFor timed out');
+      throw new Error("waitFor timed out");
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }
+
+const subscriptions: Array<{ dispose(): void }> = [];
+
+afterAll(() => {
+  for (const subscription of subscriptions) {
+    try {
+      subscription.dispose();
+    } catch {
+      // A double-disposed subscription must not fail the suite.
+    }
+  }
+});
 
 function findCommand(name: string): RegisteredCommand {
   const found = commands.find((command) => command.name === name);
@@ -146,51 +188,54 @@ function findCommand(name: string): RegisteredCommand {
 }
 
 const EXPECTED_COMMANDS = [
-  'freebuff.start',
-  'freebuff.continue',
-  'freebuff.restart',
-  'freebuff.sendPrompt',
-  'freebuff.check',
-  'freebuff.install',
-  'freebuff.clearChanges',
-  'freebuff.openChange',
-  'freebuff.diffChange',
+  "freebuff.start",
+  "freebuff.continue",
+  "freebuff.restart",
+  "freebuff.sendPrompt",
+  "freebuff.check",
+  "freebuff.install",
+  "freebuff.clearChanges",
+  "freebuff.openChange",
+  "freebuff.diffChange",
 ];
 
-describe('activate', () => {
-  test('registers commands, chat view and status item', async () => {
-    extension.activate({ subscriptions: [] } as unknown as vscode.ExtensionContext);
-    await waitFor(() => (statusBar?.text ?? '').includes('Freebuff'), 20_000);
+describe("activate", () => {
+  test("registers commands, chat view and status item", async () => {
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    extension.activate(context);
+    await waitFor(() => (statusBar?.text ?? "").includes("Freebuff"), 20_000);
     for (const name of EXPECTED_COMMANDS) {
       expect(commands.map((command) => command.name)).toContain(name);
     }
-    expect(providers.map((entry) => entry.viewType)).toContain('freebuff.chat');
-    expect(statusBar?.text).toContain('Freebuff');
+    expect(providers.map((entry) => entry.viewType)).toContain("freebuff.chat");
+    expect(statusBar?.text).toContain("Freebuff");
   }, 30_000);
 });
 
-describe('sendPrompt command', () => {
-  test('sanitizes the prompt, launches the CLI and submits', async () => {
-    vscodeStub.window.showInputBox = async () => '  fix  \n the bug  ';
-    await findCommand('freebuff.sendPrompt').callback();
+describe("sendPrompt command", () => {
+  test("sanitizes the prompt, launches the CLI and submits", async () => {
+    vscodeStub.window.showInputBox = async () => "  fix  \n the bug  ";
+    await findCommand("freebuff.sendPrompt").callback();
 
     // First write launches the TUI, second one types and submits the prompt.
     await waitFor(() => sent.length >= 2, 15_000);
-    expect(sent[0]?.text).toBe('freebuff');
+    expect(sent[0]?.text).toBe("freebuff");
     expect(sent[0]?.addNewLine).toBe(true);
-    expect(sent[1]?.text).toBe('fix the bug\r');
+    expect(sent[1]?.text).toBe("fix the bug\n");
     expect(sent[1]?.addNewLine).toBe(false);
   }, 30_000);
 });
 
-describe('FreebuffTerminal', () => {
-  test('relaunches the TUI when the previous process is gone', async () => {
+describe("FreebuffTerminal", () => {
+  test("relaunches the TUI when the previous process is gone", async () => {
     const config = () =>
-      ({ get: (_key: string, fallback: unknown) => fallback }) as unknown as vscode.WorkspaceConfiguration;
+      ({
+        get: (_key: string, fallback: unknown) => fallback,
+      }) as unknown as vscode.WorkspaceConfiguration;
     const terminal = new FreebuffTerminal(config, () => undefined);
 
     const before = sent.length;
-    const result = await terminal.sendPrompt('hello from the test');
+    const result = await terminal.sendPrompt("hello from the test");
     expect(result.sent).toBe(true);
 
     await waitFor(() => sent.length > before, 15_000);
@@ -198,8 +243,62 @@ describe('FreebuffTerminal', () => {
     // The final write is always the submitted prompt, whatever relaunch path
     // the process check selected.
     const last = tail[tail.length - 1];
-    expect(last?.text).toBe('hello from the test\r');
-    expect(tail.some((entry) => entry.text === 'freebuff' || entry.text.endsWith('freebuff'))).toBe(true);
+    expect(last?.text).toBe("hello from the test\n");
+    expect(
+      tail.some(
+        (entry) => entry.text === "freebuff" || entry.text.endsWith("freebuff"),
+      ),
+    ).toBe(true);
     terminal.dispose();
   }, 40_000);
+});
+
+describe("model selection from the chat view", () => {
+  test("selectModel writes settings.json and republishes the pick", async () => {
+    const registration = providers.find(
+      (entry) => entry.viewType === "freebuff.chat",
+    );
+    expect(registration).toBeDefined();
+
+    let receive: ((message: unknown) => void) | undefined;
+    const view = {
+      webview: {
+        cspSource: "csp",
+        options: {},
+        html: "",
+        postMessage: (message: unknown) => {
+          postedMessages.push(message);
+          return Promise.resolve(true);
+        },
+        onDidReceiveMessage: (listener: (message: unknown) => void) => {
+          receive = listener;
+          return { dispose: () => undefined };
+        },
+      },
+      onDidDispose: () => ({ dispose: () => undefined }),
+    };
+    const provider = (
+      registration as {
+        provider: { resolveWebviewView(target: unknown): void };
+      }
+    ).provider;
+    provider.resolveWebviewView(view);
+
+    receive?.({ type: "ready" });
+    receive?.({ type: "selectModel", id: "z-ai/glm-5.3-flash" });
+
+    await waitFor(() => fs.existsSync(tempSettingsPath), 5_000);
+    const saved = JSON.parse(fs.readFileSync(tempSettingsPath, "utf8")) as {
+      freebuffModel?: string;
+    };
+    expect(saved.freebuffModel).toBe("z-ai/glm-5.3-flash");
+
+    const republished = postedMessages.some(
+      (message) =>
+        (message as { type?: string }).type === "models" &&
+        (message as { current?: string }).current === "z-ai/glm-5.3-flash",
+    );
+    await waitFor(() => republished, 5_000);
+    expect(republished).toBe(true);
+  }, 20_000);
 });

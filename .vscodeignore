@@ -8,3 +8,4 @@ bun.lock
 tsconfig.json
 **/*.map
 *.vsix
+.preview/**

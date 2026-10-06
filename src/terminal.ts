@@ -1,5 +1,5 @@
-import * as vscode from 'vscode';
-import { delay, isFreebuffCliRunning } from './freebuff';
+import * as vscode from "vscode";
+import { delay, isFreebuffCliRunning } from "./freebuff";
 
 export interface SendResult {
   sent: boolean;
@@ -42,23 +42,28 @@ export class FreebuffTerminal implements vscode.Disposable {
   private settings(): TerminalSettings {
     const config = this.getConfiguration();
     return {
-      name: config.get<string>('terminal.name', 'Freebuff'),
-      startupDelayMs: Math.max(0, config.get<number>('terminal.startupDelayMs', 1200)),
-      submitSequence: config.get<string>('terminal.submitSequence', '\r'),
-      revealOnSend: config.get<boolean>('terminal.revealOnSend', true),
-      executable: config.get<string>('executable', '').trim(),
+      name: config.get<string>("terminal.name", "Freebuff"),
+      startupDelayMs: Math.max(
+        0,
+        config.get<number>("terminal.startupDelayMs", 1200),
+      ),
+      submitSequence: config.get<string>("terminal.submitSequence", "\n"),
+      revealOnSend: config.get<boolean>("terminal.revealOnSend", true),
+      executable: config.get<string>("executable", "").trim(),
     };
   }
 
   get isRunning(): boolean {
-    return this.terminal !== undefined && this.terminal.exitStatus === undefined;
+    return (
+      this.terminal !== undefined && this.terminal.exitStatus === undefined
+    );
   }
 
   private launchCommand(extraArgs: string[] = []): string {
     const { executable } = this.settings();
-    const base = executable && executable.length > 0 ? executable : 'freebuff';
-    const quoted = executable.includes(' ') ? `"${executable}"` : base;
-    return [quoted, ...extraArgs].join(' ').trim();
+    const base = executable && executable.length > 0 ? executable : "freebuff";
+    const quoted = executable.includes(" ") ? `"${executable}"` : base;
+    return [quoted, ...extraArgs].join(" ").trim();
   }
 
   /** Create the terminal (or reuse a live one) and launch Freebuff in it. */
@@ -89,14 +94,16 @@ export class FreebuffTerminal implements vscode.Disposable {
     return terminal;
   }
 
-  restart(extraArgs: string[] = []): vscode.Terminal {
+  restart(extraArgs: string[] = [], focus = true): vscode.Terminal {
     if (this.terminal) {
       const closing = this.terminal;
       this.terminal = undefined;
       closing.dispose();
     }
     const terminal = this.start(extraArgs);
-    terminal.show(false);
+    if (focus) {
+      terminal.show(false);
+    }
     return terminal;
   }
 
