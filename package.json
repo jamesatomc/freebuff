@@ -1,0 +1,171 @@
+{
+  "name": "freebuff-vscode",
+  "displayName": "Freebuff",
+  "description": "Use Freebuff, the free coding agent, inside VS Code: chat panel, integrated-terminal runner, install checks, and changed-file tracking.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "keywords": [
+    "freebuff",
+    "ai",
+    "agent",
+    "coding",
+    "chat"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "freebuff",
+          "title": "Freebuff",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "freebuff": [
+        {
+          "id": "freebuff.chat",
+          "name": "Chat",
+          "type": "webview"
+        },
+        {
+          "id": "freebuff.changes",
+          "name": "Changed Files"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "freebuff.start",
+        "title": "Freebuff: Start in Integrated Terminal"
+      },
+      {
+        "command": "freebuff.continue",
+        "title": "Freebuff: Continue Last Session"
+      },
+      {
+        "command": "freebuff.restart",
+        "title": "Freebuff: Restart in Terminal"
+      },
+      {
+        "command": "freebuff.sendPrompt",
+        "title": "Freebuff: Send Prompt..."
+      },
+      {
+        "command": "freebuff.check",
+        "title": "Freebuff: Check Installation",
+        "icon": "$(search)"
+      },
+      {
+        "command": "freebuff.install",
+        "title": "Freebuff: Install or Update"
+      },
+      {
+        "command": "freebuff.clearChanges",
+        "title": "Freebuff: Clear Changed Files",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "freebuff.openChange",
+        "title": "Freebuff: Open Changed File"
+      },
+      {
+        "command": "freebuff.diffChange",
+        "title": "Freebuff: Open Diff vs HEAD",
+        "icon": "$(diff)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "freebuff.clearChanges",
+          "when": "view == freebuff.changes",
+          "group": "navigation"
+        },
+        {
+          "command": "freebuff.check",
+          "when": "view == freebuff.chat",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "freebuff.diffChange",
+          "when": "viewItem == changedFile",
+          "group": "1_diff@1"
+        },
+        {
+          "command": "freebuff.openChange",
+          "when": "viewItem == changedFile",
+          "group": "1_diff@2"
+        },
+        {
+          "command": "freebuff.clearChanges",
+          "when": "viewItem == changedFile",
+          "group": "2_misc@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Freebuff",
+      "properties": {
+        "freebuff.packageManager": {
+          "type": "string",
+          "enum": ["", "npm", "bun", "pnpm", "yarn"],
+          "default": "",
+          "markdownDescription": "Package manager used by `Freebuff: Install or Update`. Leave empty to auto-detect or ask."
+        },
+        "freebuff.executable": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path or command used to run Freebuff. Leave empty to use `freebuff` found on `PATH`."
+        },
+        "freebuff.terminal.name": {
+          "type": "string",
+          "default": "Freebuff",
+          "description": "Name of the integrated terminal that runs Freebuff."
+        },
+        "freebuff.terminal.startupDelayMs": {
+          "type": "number",
+          "default": 1200,
+          "minimum": 0,
+          "description": "How long to wait after (re)starting Freebuff before the first prompt is typed, so the TUI is ready."
+        },
+        "freebuff.terminal.submitSequence": {
+          "type": "string",
+          "default": "\r",
+          "markdownDescription": "Bytes appended to a prompt to submit it inside the Freebuff TUI. `\\r` (Enter) by default; use `\\n` if prompts never submit."
+        },
+        "freebuff.terminal.revealOnSend": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reveal the Freebuff terminal when a prompt is sent without stealing focus from the chat panel."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "bun build src/extension.ts --target=node --format=cjs --sourcemap --external=vscode --outfile=dist/extension.js",
+    "watch": "bun build src/extension.ts --target=node --format=cjs --sourcemap --external=vscode --outfile=dist/extension.js --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run typecheck && bun run build && bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/node": "^22.10.0",
+    "@types/vscode": "1.85.0",
+    "typescript": "^5.7.0"
+  }
+}
