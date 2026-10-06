@@ -44,6 +44,7 @@ function resolveFsPath(argument: unknown): string | undefined {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  console.log('freebuff-vscode: activated');
   const configuration = (): vscode.WorkspaceConfiguration =>
     vscode.workspace.getConfiguration('freebuff');
   const root = (): string | undefined => firstWorkspaceRoot(vscode.workspace.workspaceFolders);

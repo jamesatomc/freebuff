@@ -1,0 +1,10 @@
+.vscode/**
+.vscodeignore
+.gitignore
+.freebuff/**
+src/**
+test/**
+bun.lock
+tsconfig.json
+**/*.map
+*.vsix

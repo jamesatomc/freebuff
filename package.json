@@ -156,8 +156,8 @@
     }
   },
   "scripts": {
-    "build": "bun build src/extension.ts --target=node --format=cjs --sourcemap --external=vscode --outfile=dist/extension.js",
-    "watch": "bun build src/extension.ts --target=node --format=cjs --sourcemap --external=vscode --outfile=dist/extension.js --watch",
+    "build": "bun build src/extension.ts --target=node --format=cjs --sourcemap --external=vscode --outdir dist",
+    "watch": "bun build src/extension.ts --target=node --format=cjs --sourcemap --external=vscode --outdir dist --watch",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check": "bun run typecheck && bun run build && bun test"
